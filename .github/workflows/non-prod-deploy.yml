@@ -14,7 +14,9 @@ jobs:
       IMAGE_REPO_NAME: uwwlinkedin-nonprod
       IMAGE_TAG: latest
       ECR_REPOSITORY_URI: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/uwwlinkedin-nonprod
+      ECR_REPOSITORY_DATE_TAG: ${{ github.run_id }}
       ECS_CONTAINER_NAME: uwwnonprod-linkedin-container
+      ECS_TASK_DEFINITION: uwwnonprod-linkedin-taskdef
       ECS_SERVICE_NAME: uwwnonprod-linkedin-taskdef-service-wosgt2eo
       ECS_CLUSTER_NAME: uwwnonprod-linkedin-ecs
 
@@ -38,15 +40,35 @@ jobs:
       - name: Tag and push image
         id: build-image
         run: |
+          docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $ECR_REPOSITORY_URI:$ECR_REPOSITORY_DATE_TAG
           docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $ECR_REPOSITORY_URI:$IMAGE_TAG
+          docker push $ECR_REPOSITORY_URI:$ECR_REPOSITORY_DATE_TAG
           docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
           echo "image=$ECR_REPOSITORY_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition \
+          --task-definition $ECS_TASK_DEFINITION \
+          --query taskDefinition > task-definition.json
+
+      - name: Remove unsupported fields from task definition
+        run: |
+          jq 'del(.enableFaultInjection)' task-definition.json > task-definition-clean.json
+          mv task-definition-clean.json task-definition.json
+
+      - name: Render new task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
 
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: uwwnonprod-linkedin-taskdef
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ env.ECS_SERVICE_NAME }}
           cluster: ${{ env.ECS_CLUSTER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
           wait-for-service-stability: true
