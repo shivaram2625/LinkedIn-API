@@ -17,7 +17,7 @@ jobs:
       ECR_REPOSITORY_DATE_TAG: ${{ github.run_id }}
       ECS_CONTAINER_NAME: uwwnonprod-linkedin-container
       ECS_TASK_DEFINITION: uwwnonprod-linkedin-taskdef
-      ECS_SERVICE_NAME: uwwnonprod-linkedin-taskdef-service-wosgt2eo
+      ECS_SERVICE_NAME: uwwnonprod-linkedin-service
       ECS_CLUSTER_NAME: uwwnonprod-linkedin-ecs
 
     steps:
